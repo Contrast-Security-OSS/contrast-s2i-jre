@@ -1,0 +1,38 @@
+#!/bin/bash
+
+set -e
+
+APP_TARGET=${APP_TARGET:-target}
+
+function s2i_echo {
+    echo "[s2i] $@"
+}
+
+s2i_echo "Starting Spring Boot application"
+s2i_echo "APP_TARGET = $APP_TARGET"
+
+if [[ ! -z $JAVA_OPTS ]]
+then
+    s2i_echo "JAVA_OPTS = $JAVA_OPTS"
+fi
+
+s2i_echo "Downloading Contrast Agent"
+URL=$CONTRAST_URL
+URL+="api/ng/"
+URL+=$CONTRAST_ORGANIZATION_ID
+URL+="/agents/default/java"
+curl --max-time 15 $URL -H API-Key:$CONTRAST_API_KEY -H Authorization:$CONTRAST_AUTHORIZATION -o contrast.jar
+
+s2i_echo "Searching for a valid JAR file (in $PWD/$APP_TARGET)"
+
+EXECUTABLE=$(find $APP_TARGET -maxdepth 2 -name "*.jar")
+if [[ -z $EXECUTABLE ]]
+then
+   s2i_echo "ERROR: No executeable JAR file found"
+   exit 1
+fi
+
+s2i_echo "Found $PWD/$EXECUTABLE"
+s2i_echo "Running application with Contrast"
+
+exec java -javaagent:contrast.jar -Dapplication.name=S2iDemo -Dcontrast.server=S2iDemoServer -Dcontrast.path=/s2idemo $JAVA_OPTS -jar $EXECUTABLE
